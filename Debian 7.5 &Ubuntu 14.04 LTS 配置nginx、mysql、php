@@ -1,0 +1,119 @@
+##Debian 7.5 &Ubuntu 14.04 LTS 配置nginx、mysql、php
+##此教程适用于Debian 7.5 和 Ubuntu 14.04 LTS，同样适用于阿里云服务器上对应版本。
+
+(Debian，更加稳定，更省资源)
+如果在阿里云上使用Debian，由于阿里云默认的Debian版本过于老旧，请先滚动升级到Debian的最新版本 7.5。
+
+配置源，更新一下
+sudo apt-get update
+sudo apt-get upgrade
+
+#安装vim
+sudo apt-get install vim
+安装nginx
+sudo apt-get install nginx
+安装mysql
+#切换管理员权限
+sudo su
+
+#安装mysql服务器端和客户端
+apt-get install mysql-server mysql-client
+安装过程中会提示输入密码，请按要求输入即可。
+
+安装PHP5
+apt-get install php5-fpm
+编辑Nginx配置文件
+(1).Nginx优化
+
+cd /etc/nginx/
+vim nginx.conf
+#将第二行改成你的cpu核心数，例如你的服务器是双核cpu，那就填2
+worker_processes 4;
+(2).配置Nginx支持PHP
+bash
+cd sites-available
+cp default php
+vim php
+
+server {
+    #listen   80; ## listen for ipv4; this line is default and implied
+    #listen   [::]:80 default ipv6only=on; ## listen for ipv6
+
+    #root /usr/share/nginx/www;
+    #如果是服务器上，请放到/var/www, 如果是开发环境请放到/home/aaron/www
+    root /var/www;
+
+    #加上index.php, 这样会默认执行index.php
+    index index.html index.htm index.php;
+
+    # Make site accessible from http://localhost/
+    #服务器上改成自己的域名
+    server_name localhost;
+
+    location / {
+        # First attempt to serve request as file, then
+        # as directory, then fall back to index.html
+        try_files $uri $uri/ /index.html;
+        # Uncomment to enable naxsi on this location
+        # include /etc/nginx/naxsi.rules
+    }
+
+    #使用php5-fpm解析php，其实也就是让nginx支持php
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        #   # NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+        #
+        #   # With php5-cgi alone:
+        #   fastcgi_pass 127.0.0.1:9000;
+        #   # With php5-fpm:
+        fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi_params;
+    }
+}
+(3).使Nginx配置文件生效
+bash
+cd ..
+cd sites-enabled
+rm default
+ln -s /etc/nginx/sites-available/php /etc/nginx/sites-enabled/php
+
+(4).放置PHP探针文件phpinfo.php
+bash
+cd /var/www
+vim info.php
+
+<?php
+phpinfo();
+(5).好了，重启Nginx和php5-fpm
+bash
+service nginx restart
+service php5-fpm restart
+
+访问http://127.0.0.1/info.php,如果看到phpinfo信息，那就是成功了。
+
+安装PHP的相关模块
+#模块查询
+apt-cache search php5
+
+#常见模块
+#php5-mysql php5-curl php5-gd php5-intl php-pear php5-imagick php5-imap php5-mcrypt php5-memcache php5-ming php5-ps php5-pspell php5-recode php5-snmp php5-sqlite php5-tidy php5-xmlrpc php5-xsl
+
+#以下为必装模块：
+#php5-cli，linux下cron定时执行程序
+#php5-mysql，PHP对mysql的支持
+#php5-gd，验证码、缩略图、裁剪必备
+#php5-mcrypt，加密用的
+
+apt-get install php5-cli php5-mysql php5-gd php5-mcrypt
+
+#重启服务
+service nginx restart
+service php5-fpm restart
+装完后，访问http://127.0.0.1/info.php，看看是否已经装上了。
+
+安装phpMyAdmin
+请直接去官网下载最新版的phpMyAdmin，进入官网
+下载后，放入/var/www目录中即可，如果是用ssh，您可以通过sftp方式上传，如果直接在服务器上操作，可以使用wget命令下载。
+完成后，将phpMyAdmin中config.sample.inc.php复制一份并命名为config.inc.php。
+如果需要设置为不输入密码就可以直接登录，请编辑config.inc.php php $cfg['Servers'][$i]['auth_type'] = 'config';//使用配置文件验证登录 $cfg['Servers'][$i]['users'] = 'root'; //你的mysql用户名 $cfg['Servers'][$i]['password'] = 'root'; //你的mysql密码 这样下次重新打开浏览器，就会直接登录进去了。
